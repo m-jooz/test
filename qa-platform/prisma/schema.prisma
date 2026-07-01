@@ -1,0 +1,258 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  ADMIN
+  LEAD
+  TESTER
+  VIEWER
+}
+
+enum ProjectType {
+  WEB
+  ANDROID
+  IOS
+}
+
+enum Platform {
+  WEB
+  ANDROID
+  IOS
+}
+
+enum TestCaseType {
+  MANUAL
+  E2E
+  API
+  UNIT
+  PERFORMANCE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TestRunStatus {
+  PASS
+  FAIL
+  BLOCKED
+  SKIPPED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BugStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AttachmentType {
+  IMAGE
+  VIDEO
+}
+
+// ---------- Models ----------
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(TESTER)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  createdProjects   Project[]       @relation("ProjectCreatedBy")
+  testCases         TestCase[]      @relation("TestCaseCreatedBy")
+  testRuns          TestRun[]       @relation("TestRunExecutedBy")
+  bugReviews        TestRun[]       @relation("TestRunBugReviewedBy")
+  jiraTaskViews     JiraTaskView[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  reports           Report[]
+
+  @@map("users")
+}
+
+model Project {
+  id              String      @id @default(uuid())
+  name            String
+  type            ProjectType
+  description     String?
+  jiraProjectKey  String?     @map("jira_project_key")
+  jiraBaseUrl     String?     @map("jira_base_url")
+  jiraApiToken    String?     @map("jira_api_token")
+  createdBy       String      @map("created_by")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  creator     User         @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
+  jiraTasks   JiraTask[]
+  testCases   TestCase[]
+  activityLogs ActivityLog[]
+  reports     Report[]
+
+  @@map("projects")
+}
+
+model JiraTask {
+  id               String   @id @default(uuid())
+  projectId        String   @map("project_id")
+  jiraKey          String   @map("jira_key")
+  title            String
+  currentStatus    String?  @map("current_status")
+  currentAssignee  String?  @map("current_assignee")
+  jiraUrl          String?  @map("jira_url")
+  jiraUpdatedAt    DateTime? @map("jira_updated_at")
+  syncedAt         DateTime @default(now()) @map("synced_at")
+
+  project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testCases  TestCase[]
+  views      JiraTaskView[]
+
+  @@unique([projectId, jiraKey])
+  @@map("jira_tasks")
+}
+
+model JiraTaskView {
+  id         String   @id @default(uuid())
+  jiraTaskId String   @map("jira_task_id")
+  userId     String   @map("user_id")
+  seenAt     DateTime @default(now()) @map("seen_at")
+
+  jiraTask JiraTask @relation(fields: [jiraTaskId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jiraTaskId, userId])
+  @@map("jira_task_views")
+}
+
+model TestCase {
+  id             String       @id @default(uuid())
+  projectId      String       @map("project_id")
+  jiraTaskId     String?      @map("jira_task_id")
+  title          String
+  steps          String
+  expectedResult String       @map("expected_result")
+  platform       Platform
+  type           TestCaseType
+  priority       Priority     @default(MEDIUM)
+  createdBy      String       @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jiraTask JiraTask? @relation(fields: [jiraTaskId], references: [id])
+  creator  User      @relation("TestCaseCreatedBy", fields: [createdBy], references: [id])
+  testRuns TestRun[]
+
+  @@map("test_cases")
+}
+
+model TestRun {
+  id                String        @id @default(uuid())
+  testCaseId        String        @map("test_case_id")
+  status            TestRunStatus
+  actualResult      String?       @map("actual_result")
+  notes             String?
+  severity          Severity?
+  isBug             Boolean       @default(false) @map("is_bug")
+  bugDetails        String?       @map("bug_details")
+  bugStatus         BugStatus?    @map("bug_status")
+  bugReviewedBy     String?       @map("bug_reviewed_by")
+  bugReviewedAt     DateTime?     @map("bug_reviewed_at")
+  rejectReason      String?       @map("reject_reason")
+  jiraCommentId     String?       @map("jira_comment_id")
+  jiraStatusBefore  String?       @map("jira_status_before")
+  jiraStatusAfter   String?       @map("jira_status_after")
+  jiraReassignedTo  String?       @map("jira_reassigned_to")
+  retestOfRunId     String?       @map("retest_of_run_id")
+  executedBy        String        @map("executed_by")
+  executedAt        DateTime      @default(now()) @map("executed_at")
+
+  testCase    TestCase    @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  executor    User        @relation("TestRunExecutedBy", fields: [executedBy], references: [id])
+  bugReviewer User?       @relation("TestRunBugReviewedBy", fields: [bugReviewedBy], references: [id])
+  retestOf    TestRun?    @relation("RetestOf", fields: [retestOfRunId], references: [id])
+  retests     TestRun[]   @relation("RetestOf")
+  attachments Attachment[]
+
+  @@map("test_runs")
+}
+
+model Attachment {
+  id         String         @id @default(uuid())
+  testRunId  String         @map("test_run_id")
+  fileUrl    String         @map("file_url")
+  type       AttachmentType
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  testRun TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  message    String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  projectId  String?  @map("project_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@map("activity_logs")
+}
+
+model Report {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  title      String
+  filters    Json?
+  data       Json?
+  shareToken String   @unique @map("share_token")
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User    @relation(fields: [createdBy], references: [id])
+
+  @@map("reports")
+}

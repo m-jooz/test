@@ -1,0 +1,14 @@
+import * as Prisma from './internal/prismaNamespaceBrowser.js';
+export { Prisma };
+export * as $Enums from './enums.js';
+export * from './enums.js';
+export type User = Prisma.UserModel;
+export type Project = Prisma.ProjectModel;
+export type JiraTask = Prisma.JiraTaskModel;
+export type JiraTaskView = Prisma.JiraTaskViewModel;
+export type TestCase = Prisma.TestCaseModel;
+export type TestRun = Prisma.TestRunModel;
+export type Attachment = Prisma.AttachmentModel;
+export type Notification = Prisma.NotificationModel;
+export type ActivityLog = Prisma.ActivityLogModel;
+export type Report = Prisma.ReportModel;
