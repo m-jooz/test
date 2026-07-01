@@ -41,11 +41,22 @@ export class ProjectsService {
     return project;
   }
 
-  findAll() {
-    return this.prisma.project.findMany({
-      select: projectSelect,
+  async findAll() {
+    const projects = await this.prisma.project.findMany({
+      select: {
+        ...projectSelect,
+        _count: { select: { testCases: true, jiraTasks: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
+
+    return projects.map(({ _count, ...rest }) => ({
+      ...rest,
+      stats: {
+        testCasesCount: _count.testCases,
+        jiraTasksCount: _count.jiraTasks,
+      },
+    }));
   }
 
   async findOne(id: string) {

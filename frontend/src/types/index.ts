@@ -16,9 +16,13 @@ export interface Project {
   id: string
   name: string
   type: 'WEB' | 'ANDROID' | 'IOS'
-  description: string
-  jiraProjectKey: string
+  description: string | null
+  jiraProjectKey: string | null
   createdAt: string
+  stats: {
+    testCasesCount: number
+    jiraTasksCount: number
+  }
 }
 
 export interface JiraTask {
