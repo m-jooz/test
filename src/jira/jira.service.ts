@@ -99,7 +99,7 @@ export class JiraService {
     try {
       const response = await axios.get<{
         fields?: { status?: { name?: string } };
-      }>(`${this.jiraBaseUrl(project)}/rest/api/2/issue/${jiraKey}`, {
+      }>(`${this.jiraBaseUrl(project)}/rest/api/3/issue/${jiraKey}`, {
         params: { fields: 'status' },
         headers: this.authHeaders(project),
       });
@@ -107,6 +107,23 @@ export class JiraService {
     } catch {
       throw new BadGatewayException('Failed to fetch issue status from Jira');
     }
+  }
+
+  /**
+   * API v3 requires comment bodies in Atlassian Document Format (ADF)
+   * rather than a plain string.
+   */
+  private toAdf(text: string) {
+    return {
+      type: 'doc',
+      version: 1,
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text }],
+        },
+      ],
+    };
   }
 
   /** Adds a comment to a Jira issue and returns the created comment's id. */
@@ -120,8 +137,8 @@ export class JiraService {
 
     try {
       const response = await axios.post<{ id: string }>(
-        `${this.jiraBaseUrl(project)}/rest/api/2/issue/${jiraKey}/comment`,
-        { body },
+        `${this.jiraBaseUrl(project)}/rest/api/3/issue/${jiraKey}/comment`,
+        { body: this.toAdf(body) },
         { headers: this.authHeaders(project) },
       );
       return response.data.id;
@@ -141,7 +158,7 @@ export class JiraService {
 
     try {
       await axios.post(
-        `${this.jiraBaseUrl(project)}/rest/api/2/issue/${jiraKey}/transitions`,
+        `${this.jiraBaseUrl(project)}/rest/api/3/issue/${jiraKey}/transitions`,
         { transition: { id: transitionId } },
         { headers: this.authHeaders(project) },
       );
@@ -161,7 +178,7 @@ export class JiraService {
 
     try {
       await axios.put(
-        `${this.jiraBaseUrl(project)}/rest/api/2/issue/${jiraKey}`,
+        `${this.jiraBaseUrl(project)}/rest/api/3/issue/${jiraKey}`,
         { fields: { assignee: { accountId } } },
         { headers: this.authHeaders(project) },
       );
@@ -185,7 +202,7 @@ export class JiraService {
     }
     this.assertJiraConfigured(project);
 
-    const searchUrl = `${project.jiraBaseUrl.replace(/\/+$/, '')}/rest/api/2/search`;
+    const searchUrl = `${project.jiraBaseUrl.replace(/\/+$/, '')}/rest/api/3/search/jql`;
 
     let issues: JiraSearchResponse['issues'];
     try {
