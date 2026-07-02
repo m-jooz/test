@@ -206,10 +206,9 @@ export class JiraService {
     this.assertJiraConfigured(project);
 
     const searchUrl = `${project.jiraBaseUrl.replace(/\/+$/, '')}/rest/api/3/search/jql`;
-    const jql = `project = "${project.jiraProjectKey}" ORDER BY created DESC`;
+    const jql = `project = ${project.jiraProjectKey} ORDER BY created DESC`;
     const requestBody = {
       jql,
-      fields: ['summary', 'status', 'assignee', 'updated'],
       maxResults: 100,
     };
 
