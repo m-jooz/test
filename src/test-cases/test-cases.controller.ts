@@ -26,8 +26,8 @@ export class TestCasesController {
   constructor(private readonly testCasesService: TestCasesService) {}
 
   @Post()
-  @Roles(Role.LEAD, Role.TESTER)
-  @ApiOperation({ summary: 'Create a test case (Lead/Tester only)' })
+  @Roles(Role.ADMIN, Role.LEAD, Role.TESTER)
+  @ApiOperation({ summary: 'Create a test case (Admin/Lead/Tester only)' })
   create(
     @Body() dto: CreateTestCaseDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -48,8 +48,8 @@ export class TestCasesController {
   }
 
   @Patch(':id')
-  @Roles(Role.LEAD, Role.TESTER)
-  @ApiOperation({ summary: 'Update a test case (Lead/Tester only)' })
+  @Roles(Role.ADMIN, Role.LEAD, Role.TESTER)
+  @ApiOperation({ summary: 'Update a test case (Admin/Lead/Tester only)' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTestCaseDto,
@@ -59,8 +59,8 @@ export class TestCasesController {
   }
 
   @Delete(':id')
-  @Roles(Role.LEAD)
-  @ApiOperation({ summary: 'Delete a test case (Lead only)' })
+  @Roles(Role.ADMIN, Role.LEAD)
+  @ApiOperation({ summary: 'Delete a test case (Admin/Lead only)' })
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
