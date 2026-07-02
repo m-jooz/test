@@ -51,6 +51,7 @@ export interface JiraTaskSummary {
   jiraKey: string
   title: string
   currentStatus: string | null
+  jiraUrl: string | null
 }
 
 export interface TestCase {
@@ -67,6 +68,13 @@ export interface TestCase {
   createdAt: string
   creator: UserSummary
   jiraTask: JiraTaskSummary | null
+}
+
+export interface TestCaseDetail extends TestCase {
+  project: {
+    id: string
+    name: string
+  }
 }
 
 export interface Attachment {

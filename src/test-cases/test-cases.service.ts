@@ -11,7 +11,13 @@ import { UpdateTestCaseDto } from './dto/update-test-case.dto';
 const testCaseInclude = {
   creator: { select: { id: true, name: true, email: true } },
   jiraTask: {
-    select: { id: true, jiraKey: true, title: true, currentStatus: true },
+    select: {
+      id: true,
+      jiraKey: true,
+      title: true,
+      currentStatus: true,
+      jiraUrl: true,
+    },
   },
 } as const;
 

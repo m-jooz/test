@@ -3,6 +3,7 @@ import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ProjectsPage from './pages/projects/ProjectsPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
+import TestCaseDetailPage from './pages/test-cases/TestCaseDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 
@@ -17,6 +18,7 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/test-cases/:id" element={<TestCaseDetailPage />} />
           </Route>
         </Route>
 
