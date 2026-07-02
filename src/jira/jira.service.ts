@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import axios, { isAxiosError } from 'axios';
@@ -12,6 +13,8 @@ import { Project } from '../generated/prisma/client.js';
 
 @Injectable()
 export class JiraService {
+  private readonly logger = new Logger(JiraService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityLogs: ActivityLogsService,
@@ -203,23 +206,47 @@ export class JiraService {
     this.assertJiraConfigured(project);
 
     const searchUrl = `${project.jiraBaseUrl.replace(/\/+$/, '')}/rest/api/3/search/jql`;
+    const jql = `project = "${project.jiraProjectKey}" ORDER BY created DESC`;
+    const requestBody = {
+      jql,
+      fields: ['summary', 'status', 'assignee', 'updated'],
+      maxResults: 100,
+    };
+
+    this.logger.log(
+      `Jira search request: POST ${searchUrl} body=${JSON.stringify(requestBody)}`,
+    );
 
     let issues: JiraSearchResponse['issues'];
     try {
-      const response = await axios.post<JiraSearchResponse>(
-        searchUrl,
-        {
-          jql: `project=${project.jiraProjectKey}`,
-          fields: ['summary', 'status', 'assignee', 'updated'],
-          maxResults: 100,
+      const response = await axios.post<
+        JiraSearchResponse & { total?: number; isLast?: boolean }
+      >(searchUrl, requestBody, {
+        headers: {
+          ...this.authHeaders(project),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
-        { headers: this.authHeaders(project) },
+      });
+
+      this.logger.log(
+        `Jira search response: status=${response.status} total=${response.data.total ?? 'n/a'} ` +
+          `isLast=${response.data.isLast ?? 'n/a'} issuesLength=${response.data.issues?.length ?? 0}`,
       );
+      this.logger.debug(
+        `Jira search response body: ${JSON.stringify(response.data)}`,
+      );
+
       issues = response.data.issues ?? [];
     } catch (error) {
-      throw new BadGatewayException(
-        this.buildJiraErrorMessage(error, searchUrl),
+      const message = this.buildJiraErrorMessage(error, searchUrl);
+      this.logger.error(
+        `Jira search failed: ${message}` +
+          (isAxiosError(error) && error.response
+            ? ` rawBody=${JSON.stringify(error.response.data)}`
+            : ''),
       );
+      throw new BadGatewayException(message);
     }
 
     const syncedTasks = await Promise.all(
