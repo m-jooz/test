@@ -12,6 +12,12 @@ export interface User {
   role: 'ADMIN' | 'LEAD' | 'TESTER' | 'VIEWER'
 }
 
+export interface UserSummary {
+  id: string
+  name: string
+  email: string
+}
+
 export interface Project {
   id: string
   name: string
@@ -27,33 +33,88 @@ export interface Project {
 
 export interface JiraTask {
   id: string
+  projectId: string
   jiraKey: string
   title: string
-  currentStatus: string
-  currentAssignee: string
-  jiraUrl: string
-  jiraUpdatedAt: string
+  currentStatus: string | null
+  currentAssignee: string | null
+  jiraUrl: string | null
+  jiraUpdatedAt: string | null
+  syncedAt: string
   unseen: boolean
+}
+
+export interface JiraTaskSummary {
+  id: string
+  jiraKey: string
+  title: string
+  currentStatus: string | null
 }
 
 export interface TestCase {
   id: string
+  projectId: string
+  jiraTaskId: string | null
   title: string
   steps: string
   expectedResult: string
   platform: 'WEB' | 'ANDROID' | 'IOS'
   type: 'MANUAL' | 'E2E' | 'API' | 'UNIT' | 'PERFORMANCE'
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  createdBy: string
+  createdAt: string
+  creator: UserSummary
+  jiraTask: JiraTaskSummary | null
+}
+
+export interface Attachment {
+  id: string
+  testRunId: string
+  fileUrl: string
+  type: 'IMAGE' | 'VIDEO'
+  createdAt: string
 }
 
 export interface TestRun {
   id: string
+  testCaseId: string
   status: 'PASS' | 'FAIL' | 'BLOCKED' | 'SKIPPED'
-  actualResult: string
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  actualResult: string | null
+  notes: string | null
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null
   isBug: boolean
-  bugStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
+  bugDetails: string | null
+  bugStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | null
+  bugReviewedBy: string | null
+  bugReviewedAt: string | null
+  rejectReason: string | null
+  jiraCommentId: string | null
+  jiraStatusBefore: string | null
+  jiraStatusAfter: string | null
+  jiraReassignedTo: string | null
+  retestOfRunId: string | null
+  executedBy: string
   executedAt: string
+  executor: UserSummary
+  bugReviewer: UserSummary | null
+  attachments: Attachment[]
+  testCase: {
+    id: string
+    title: string
+    steps: string
+    expectedResult: string
+    platform: 'WEB' | 'ANDROID' | 'IOS'
+    projectId: string
+    jiraTaskId: string | null
+  }
+}
+
+export interface Report {
+  id: string
+  title: string
+  shareToken: string
+  createdAt: string
+  creator: UserSummary
 }
 
 export interface Notification {
