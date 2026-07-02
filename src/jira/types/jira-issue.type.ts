@@ -4,10 +4,10 @@ export interface JiraSearchResponse {
 
 export interface JiraIssue {
   key: string;
-  fields: {
-    summary: string;
+  fields?: {
+    summary?: string;
     status?: { name: string };
     assignee?: { displayName: string } | null;
-    updated: string;
+    updated?: string;
   };
 }

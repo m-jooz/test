@@ -210,6 +210,7 @@ export class JiraService {
     const requestBody = {
       jql,
       maxResults: 100,
+      fields: ['summary', 'status', 'assignee', 'updated', 'key'],
     };
 
     this.logger.log(
@@ -255,21 +256,21 @@ export class JiraService {
           create: {
             projectId,
             jiraKey: issue.key,
-            title: issue.fields.summary,
-            currentStatus: issue.fields.status?.name,
-            currentAssignee: issue.fields.assignee?.displayName,
+            title: issue.fields?.summary ?? 'No title',
+            currentStatus: issue.fields?.status?.name ?? 'Unknown',
+            currentAssignee: issue.fields?.assignee?.displayName ?? 'Unassigned',
             jiraUrl: `${project.jiraBaseUrl!.replace(/\/+$/, '')}/browse/${issue.key}`,
-            jiraUpdatedAt: issue.fields.updated
-              ? new Date(issue.fields.updated)
-              : null,
+            jiraUpdatedAt: new Date(
+              issue.fields?.updated ?? new Date().toISOString(),
+            ),
           },
           update: {
-            title: issue.fields.summary,
-            currentStatus: issue.fields.status?.name,
-            currentAssignee: issue.fields.assignee?.displayName,
-            jiraUpdatedAt: issue.fields.updated
-              ? new Date(issue.fields.updated)
-              : null,
+            title: issue.fields?.summary ?? 'No title',
+            currentStatus: issue.fields?.status?.name ?? 'Unknown',
+            currentAssignee: issue.fields?.assignee?.displayName ?? 'Unassigned',
+            jiraUpdatedAt: new Date(
+              issue.fields?.updated ?? new Date().toISOString(),
+            ),
             syncedAt: new Date(),
           },
         }),
