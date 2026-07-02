@@ -206,14 +206,15 @@ export class JiraService {
 
     let issues: JiraSearchResponse['issues'];
     try {
-      const response = await axios.get<JiraSearchResponse>(searchUrl, {
-        params: {
+      const response = await axios.post<JiraSearchResponse>(
+        searchUrl,
+        {
           jql: `project=${project.jiraProjectKey}`,
-          fields: 'summary,status,assignee,updated',
+          fields: ['summary', 'status', 'assignee', 'updated'],
           maxResults: 100,
         },
-        headers: this.authHeaders(project),
-      });
+        { headers: this.authHeaders(project) },
+      );
       issues = response.data.issues ?? [];
     } catch (error) {
       throw new BadGatewayException(
