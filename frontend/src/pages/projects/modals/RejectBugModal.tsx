@@ -36,6 +36,7 @@ export default function RejectBugModal({
       api.patch(`/test-runs/${testRunId}/bug/reject`, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['test-runs'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success('Bug rejected')
       onClose()
     },

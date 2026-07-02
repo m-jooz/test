@@ -127,6 +127,60 @@ export interface Report {
   creator: UserSummary
 }
 
+export interface DashboardOverview {
+  totalTestCases: number
+  totalTestRuns: number
+  passCount: number
+  failCount: number
+  blockedCount: number
+  skippedCount: number
+  passRate: number
+  failRate: number
+  blockedRate: number
+  skippedRate: number
+  totalBugs: number
+  pendingBugs: number
+  approvedBugs: number
+  rejectedBugs: number
+}
+
+export interface DashboardPlatformStat {
+  platform: 'WEB' | 'ANDROID' | 'IOS'
+  total: number
+  pass: number
+  fail: number
+}
+
+export interface DashboardActivity {
+  id: string
+  action: string
+  entityType: string
+  entityId: string
+  userName: string
+  createdAt: string
+}
+
+export interface DashboardPendingBugReview {
+  id: string
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null
+  testCaseTitle: string
+  executedByName: string
+  executedAt: string
+}
+
+export interface DashboardData {
+  project: {
+    id: string
+    name: string
+    type: 'WEB' | 'ANDROID' | 'IOS'
+  }
+  overview: DashboardOverview
+  byPlatform: DashboardPlatformStat[]
+  recentActivity: DashboardActivity[]
+  unseenJiraTasks: number
+  pendingBugReviews: DashboardPendingBugReview[]
+}
+
 export interface Notification {
   id: string
   message: string

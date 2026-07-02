@@ -73,14 +73,22 @@ export class ReportsService {
     const blockedCount = runs.filter(
       (r) => r.status === TestRunStatus.BLOCKED,
     ).length;
+    const skippedCount = runs.filter(
+      (r) => r.status === TestRunStatus.SKIPPED,
+    ).length;
     const bugs = runs.filter((r) => r.isBug);
 
     return {
       totalTestCases,
       totalTestRuns,
+      passCount,
+      failCount,
+      blockedCount,
+      skippedCount,
       passRate: this.rate(passCount, totalTestRuns),
       failRate: this.rate(failCount, totalTestRuns),
       blockedRate: this.rate(blockedCount, totalTestRuns),
+      skippedRate: this.rate(skippedCount, totalTestRuns),
       totalBugs: bugs.length,
       pendingBugs: bugs.filter((r) => r.bugStatus === BugStatus.PENDING).length,
       approvedBugs: bugs.filter((r) => r.bugStatus === BugStatus.APPROVED)

@@ -37,6 +37,7 @@ export default function ApproveBugModal({
       api.patch(`/test-runs/${testRunId}/bug/approve`, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['test-runs'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success('Bug approved and synced to Jira')
       onClose()
     },
