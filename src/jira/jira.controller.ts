@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
@@ -13,6 +14,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '../generated/prisma/enums.js';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { FindJiraTasksQueryDto } from './dto/find-jira-tasks-query.dto';
+import { SubmitQaResultDto } from './dto/submit-qa-result.dto';
+import { QaOverviewQueryDto } from './dto/qa-overview-query.dto';
 
 @ApiTags('jira')
 @ApiBearerAuth()
@@ -64,5 +67,48 @@ export class JiraController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.jiraService.markSeen(projectId, taskId, user.id);
+  }
+
+  @Get(':projectId/tasks/:taskId/transitions')
+  @ApiOperation({
+    summary: 'List the transitions currently available for a Jira task',
+  })
+  getTaskTransitions(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+  ) {
+    return this.jiraService.getTaskTransitions(projectId, taskId);
+  }
+
+  @Post(':projectId/tasks/:taskId/submit')
+  @ApiOperation({
+    summary:
+      'Submit a consolidated QA result for a Jira task (comment, label, transition, reassignment)',
+  })
+  submitQaResult(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @Body() dto: SubmitQaResultDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.jiraService.submitQaResult(projectId, taskId, dto, user.id);
+  }
+
+  @Get(':projectId/members')
+  @ApiOperation({ summary: 'List Jira-assignable members for a project' })
+  getMembers(@Param('projectId', ParseUUIDPipe) projectId: string) {
+    return this.jiraService.getAssignableMembers(projectId);
+  }
+
+  @Get(':projectId/qa-overview')
+  @ApiOperation({
+    summary:
+      'Task-focused dashboard data: ready for testing, in progress, recently completed',
+  })
+  getQaOverview(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query() query: QaOverviewQueryDto,
+  ) {
+    return this.jiraService.getQaOverview(projectId, query);
   }
 }

@@ -41,17 +41,69 @@ export interface Project {
   }
 }
 
+export type QaStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED' | 'FAILED'
+
 export interface JiraTask {
   id: string
   projectId: string
   jiraKey: string
   title: string
+  description: string | null
   currentStatus: string | null
   currentAssignee: string | null
   jiraUrl: string | null
   jiraUpdatedAt: string | null
   syncedAt: string
+  previousAssigneeId: string | null
+  previousAssigneeName: string | null
+  sentToQaAt: string | null
+  qaRequestedById: string | null
+  qaRequestedByName: string | null
+  qaStatus: QaStatus
   unseen: boolean
+}
+
+export interface JiraTaskWithQaMeta extends JiraTask {
+  testCasesCount: number
+}
+
+export interface JiraTransition {
+  id: string
+  name: string
+  to?: { name?: string }
+}
+
+export interface JiraMember {
+  accountId: string
+  displayName: string
+  avatarUrl?: string
+}
+
+export interface QaSubmission {
+  id: string
+  jiraTaskId: string
+  projectId: string
+  overallStatus: 'PASS' | 'FAIL'
+  passCount: number
+  failCount: number
+  totalCount: number
+  jiraComment: string
+  labelAdded: string | null
+  jiraStatusAfter: string | null
+  submittedBy: string
+  submittedAt: string
+  jiraTask: JiraTask
+  user: UserSummary
+}
+
+export interface QaOverview {
+  readyForTesting: JiraTaskWithQaMeta[]
+  inProgress: {
+    task: JiraTask
+    testCasesCount: number
+    completedCount: number
+  }[]
+  recentlyCompleted: QaSubmission[]
 }
 
 export interface JiraTaskSummary {

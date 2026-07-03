@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ClipboardList, Loader2, RefreshCw, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../api/client'
-import { jiraStatusBadgeClass } from '../../../lib/badges'
+import {
+  jiraStatusBadgeClass,
+  QA_STATUS_BADGE,
+  QA_STATUS_LABEL,
+} from '../../../lib/badges'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import type { ApiResponse, JiraTask, PaginatedResult } from '../../../types'
@@ -18,6 +23,7 @@ interface JiraTasksTabProps {
 }
 
 export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [selectedTask, setSelectedTask] = useState<JiraTask | null>(null)
   const [page, setPage] = useState(1)
@@ -128,7 +134,10 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
                 <th className="px-4 py-3">Title</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Assignee</th>
+                <th className="px-4 py-3">Sent to QA by</th>
+                <th className="px-4 py-3">QA Status</th>
                 <th className="px-4 py-3">Last Updated</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700 bg-gray-800">
@@ -160,7 +169,31 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
                     {task.currentAssignee ?? 'Unassigned'}
                   </td>
                   <td className="px-4 py-3 text-gray-400">
+                    {task.qaRequestedByName ?? '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${QA_STATUS_BADGE[task.qaStatus]}`}
+                    >
+                      {QA_STATUS_LABEL[task.qaStatus]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-400">
                     {formatRelativeTime(task.jiraUpdatedAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {task.currentStatus === 'Testing' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/jira/${projectId}/tasks/${task.id}/test`)
+                        }}
+                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500"
+                      >
+                        Start Testing
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

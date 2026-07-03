@@ -16,6 +16,7 @@ const TestCaseDetailPage = lazy(
 )
 const TestRunsPage = lazy(() => import('./pages/test-runs/TestRunsPage'))
 const ReportsPage = lazy(() => import('./pages/reports/ReportsPage'))
+const TaskTestingPage = lazy(() => import('./pages/jira/TaskTestingPage'))
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'))
 const UsersPage = lazy(() => import('./pages/users/UsersPage'))
 const ReportSharePage = lazy(() => import('./pages/reports/ReportSharePage'))
@@ -48,6 +49,10 @@ export default function App() {
               />
               <Route path="/test-runs" element={<TestRunsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route
+                path="/jira/:projectId/tasks/:taskId/test"
+                element={<TaskTestingPage />}
+              />
               <Route path="/profile" element={<ProfilePage />} />
 
               <Route element={<AdminRoute />}>

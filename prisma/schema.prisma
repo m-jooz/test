@@ -72,6 +72,11 @@ enum AttachmentType {
   VIDEO
 }
 
+enum QaOverallStatus {
+  PASS
+  FAIL
+}
+
 // ---------- Models ----------
 
 model User {
@@ -90,6 +95,7 @@ model User {
   notifications     Notification[]
   activityLogs      ActivityLog[]
   reports           Report[]
+  qaSubmissions     QaSubmission[]
 
   @@map("users")
 }
@@ -111,6 +117,7 @@ model Project {
   testCases   TestCase[]
   activityLogs ActivityLog[]
   reports     Report[]
+  qaSubmissions QaSubmission[]
 
   @@map("projects")
 }
@@ -120,15 +127,23 @@ model JiraTask {
   projectId        String   @map("project_id")
   jiraKey          String   @map("jira_key")
   title            String
+  description      String?  @db.Text
   currentStatus    String?  @map("current_status")
   currentAssignee  String?  @map("current_assignee")
   jiraUrl          String?  @map("jira_url")
   jiraUpdatedAt    DateTime? @map("jira_updated_at")
   syncedAt         DateTime @default(now()) @map("synced_at")
 
+  previousAssigneeId   String?   @map("previous_assignee_id")
+  previousAssigneeName String?   @map("previous_assignee_name")
+  sentToQaAt           DateTime? @map("sent_to_qa_at")
+  qaRequestedById      String?   @map("qa_requested_by_id")
+  qaRequestedByName    String?   @map("qa_requested_by_name")
+
   project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   testCases  TestCase[]
   views      JiraTaskView[]
+  qaSubmissions QaSubmission[]
 
   @@unique([projectId, jiraKey])
   @@index([projectId])
@@ -267,4 +282,27 @@ model Report {
   creator User    @relation(fields: [createdBy], references: [id])
 
   @@map("reports")
+}
+
+model QaSubmission {
+  id              String           @id @default(uuid())
+  jiraTaskId      String           @map("jira_task_id")
+  projectId       String           @map("project_id")
+  overallStatus   QaOverallStatus  @map("overall_status")
+  passCount       Int              @default(0) @map("pass_count")
+  failCount       Int              @default(0) @map("fail_count")
+  totalCount      Int              @default(0) @map("total_count")
+  jiraComment     String           @db.Text @map("jira_comment")
+  labelAdded      String?          @map("label_added")
+  jiraStatusAfter String?          @map("jira_status_after")
+  submittedBy     String           @map("submitted_by")
+  submittedAt     DateTime         @default(now()) @map("submitted_at")
+
+  jiraTask JiraTask @relation(fields: [jiraTaskId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [submittedBy], references: [id])
+
+  @@index([jiraTaskId])
+  @@index([projectId])
+  @@map("qa_submissions")
 }

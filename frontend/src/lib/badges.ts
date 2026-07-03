@@ -24,6 +24,31 @@ export const TEST_RUN_STATUS_BADGE: Record<
   SKIPPED: 'bg-gray-500/10 text-gray-400 border border-gray-500/30',
 }
 
+export const QA_STATUS_BADGE: Record<
+  'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED' | 'FAILED',
+  string
+> = {
+  NOT_STARTED: 'bg-gray-500/10 text-gray-400 border border-gray-500/30',
+  IN_PROGRESS: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30',
+  SUBMITTED: 'bg-green-500/10 text-green-400 border border-green-500/30',
+  FAILED: 'bg-red-500/10 text-red-400 border border-red-500/30',
+}
+
+export const QA_STATUS_LABEL: Record<
+  'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED' | 'FAILED',
+  string
+> = {
+  NOT_STARTED: 'Not Started',
+  IN_PROGRESS: 'In Progress',
+  SUBMITTED: 'Submitted ✅',
+  FAILED: 'Failed ❌',
+}
+
+export const QA_OVERALL_STATUS_BADGE: Record<'PASS' | 'FAIL', string> = {
+  PASS: 'bg-green-500/10 text-green-400 border border-green-500/30',
+  FAIL: 'bg-red-500/10 text-red-400 border border-red-500/30',
+}
+
 export function jiraStatusBadgeClass(status: string | null): string {
   const normalized = (status ?? '').toLowerCase()
   if (normalized.includes('done') || normalized.includes('closed')) {

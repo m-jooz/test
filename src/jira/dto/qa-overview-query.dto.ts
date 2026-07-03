@@ -1,13 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDateString, IsOptional, IsString } from 'class-validator';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
-export class FindJiraTasksQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ example: 'Testing' })
-  @IsOptional()
-  @IsString()
-  status?: string;
-
+export class QaOverviewQueryDto {
   @ApiPropertyOptional({ example: 'Jane Doe' })
   @IsOptional()
   @IsString()
@@ -22,4 +16,9 @@ export class FindJiraTasksQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  @ApiPropertyOptional({ example: 'login' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

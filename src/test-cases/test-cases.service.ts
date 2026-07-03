@@ -97,6 +97,7 @@ export class TestCasesService {
 
     const where: Prisma.TestCaseWhereInput = {
       ...(query.projectId && { projectId: query.projectId }),
+      ...(query.jiraTaskId && { jiraTaskId: query.jiraTaskId }),
       ...(query.platform && { platform: query.platform }),
       ...(query.priority && { priority: query.priority }),
       ...(query.type && { type: query.type }),

@@ -8,10 +8,32 @@ import {
 import axios, { isAxiosError } from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
-import { JiraSearchResponse } from './types/jira-issue.type';
+import {
+  JiraAssignableUser,
+  JiraChangelogEntry,
+  JiraChangelogResponse,
+  JiraSearchResponse,
+  JiraTransition,
+  JiraTransitionsResponse,
+} from './types/jira-issue.type';
 import { Project } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
+import { QaOverallStatus } from '../generated/prisma/enums.js';
 import { FindJiraTasksQueryDto } from './dto/find-jira-tasks-query.dto';
+import { SubmitQaResultDto } from './dto/submit-qa-result.dto';
 import { paginate } from '../common/dto/pagination-query.dto';
+
+const PASS_TRANSITION_KEYWORDS = [
+  'done',
+  'approved',
+  'ready for release',
+  'closed',
+  'release',
+];
+
+const IN_PROGRESS_KEYWORDS = ['in progress'];
+
+type QaStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED' | 'FAILED';
 
 @Injectable()
 export class JiraService {
@@ -122,12 +144,10 @@ export class JiraService {
     return {
       type: 'doc',
       version: 1,
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text }],
-        },
-      ],
+      content: text.split('\n').map((line) => ({
+        type: 'paragraph',
+        content: line ? [{ type: 'text', text: line }] : [],
+      })),
     };
   }
 
@@ -192,6 +212,170 @@ export class JiraService {
     }
   }
 
+  /** Adds a label to a Jira issue without removing existing labels. */
+  async addLabel(
+    projectId: string,
+    jiraKey: string,
+    label: string,
+  ): Promise<void> {
+    const project = await this.getProjectOrThrow(projectId);
+    this.assertJiraConfigured(project);
+
+    try {
+      await axios.put(
+        `${this.jiraBaseUrl(project)}/rest/api/3/issue/${jiraKey}`,
+        { update: { labels: [{ add: label }] } },
+        { headers: this.authHeaders(project) },
+      );
+    } catch {
+      throw new BadGatewayException('Failed to add label on Jira issue');
+    }
+  }
+
+  /** Lists the transitions currently available for a Jira issue. */
+  async getTransitions(
+    projectId: string,
+    jiraKey: string,
+  ): Promise<JiraTransition[]> {
+    const project = await this.getProjectOrThrow(projectId);
+    this.assertJiraConfigured(project);
+
+    try {
+      const response = await axios.get<JiraTransitionsResponse>(
+        `${this.jiraBaseUrl(project)}/rest/api/3/issue/${jiraKey}/transitions`,
+        { headers: this.authHeaders(project) },
+      );
+      return response.data.transitions ?? [];
+    } catch {
+      throw new BadGatewayException('Failed to fetch transitions from Jira');
+    }
+  }
+
+  /** Picks the best-matching "done-like" transition for an all-pass QA submission. */
+  private pickPassTransition(
+    transitions: JiraTransition[],
+  ): JiraTransition | null {
+    for (const keyword of PASS_TRANSITION_KEYWORDS) {
+      const match = transitions.find((t) =>
+        (t.to?.name ?? t.name).toLowerCase().includes(keyword),
+      );
+      if (match) return match;
+    }
+    return null;
+  }
+
+  /** Best-effort match for "In Progress", used only to pre-select the frontend dropdown. */
+  pickInProgressTransition(
+    transitions: JiraTransition[],
+  ): JiraTransition | null {
+    for (const keyword of IN_PROGRESS_KEYWORDS) {
+      const match = transitions.find((t) =>
+        (t.to?.name ?? t.name).toLowerCase().includes(keyword),
+      );
+      if (match) return match;
+    }
+    return null;
+  }
+
+  /** Fetches the assignable members for the project's Jira project. */
+  async getAssignableMembers(projectId: string) {
+    const project = await this.getProjectOrThrow(projectId);
+    if (!project.jiraProjectKey) {
+      throw new BadRequestException(
+        'Project is missing Jira configuration (jiraProjectKey)',
+      );
+    }
+    this.assertJiraConfigured(project);
+
+    try {
+      const response = await axios.get<JiraAssignableUser[]>(
+        `${this.jiraBaseUrl(project)}/rest/api/3/user/assignable/search`,
+        {
+          params: { project: project.jiraProjectKey },
+          headers: this.authHeaders(project),
+        },
+      );
+      return response.data.map((user) => ({
+        accountId: user.accountId,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrls?.['48x48'],
+      }));
+    } catch {
+      throw new BadGatewayException(
+        'Failed to fetch assignable members from Jira',
+      );
+    }
+  }
+
+  /** Fetches the full changelog (paginated) for a Jira issue. */
+  private async getChangelog(
+    project: Project & { jiraBaseUrl: string; jiraEmail: string; jiraApiToken: string },
+    jiraKey: string,
+  ): Promise<JiraChangelogEntry[]> {
+    const entries: JiraChangelogEntry[] = [];
+    let startAt = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const response = await axios.get<JiraChangelogResponse>(
+        `${this.jiraBaseUrl(project)}/rest/api/3/issue/${jiraKey}/changelog`,
+        {
+          params: { startAt, maxResults: 100 },
+          headers: this.authHeaders(project),
+        },
+      );
+      entries.push(...(response.data.values ?? []));
+      if (response.data.isLast !== false) break;
+      startAt += response.data.values?.length ?? 100;
+      if (!response.data.values?.length) break;
+    }
+    return entries;
+  }
+
+  /**
+   * Replays a Jira issue's changelog to find when it most recently moved
+   * into "Testing" status, who moved it, and who was assigned right before
+   * that hand-off.
+   */
+  private deriveQaHandoff(entries: JiraChangelogEntry[]): {
+    sentToQaAt?: Date;
+    qaRequestedById?: string;
+    qaRequestedByName?: string;
+    previousAssigneeId?: string;
+    previousAssigneeName?: string;
+  } {
+    const sorted = [...entries].sort(
+      (a, b) => new Date(a.created).getTime() - new Date(b.created).getTime(),
+    );
+
+    let currentAssigneeId: string | undefined;
+    let currentAssigneeName: string | undefined;
+
+    let result: ReturnType<typeof this.deriveQaHandoff> = {};
+
+    for (const entry of sorted) {
+      for (const item of entry.items) {
+        if (item.field === 'assignee') {
+          currentAssigneeId = item.to ?? undefined;
+          currentAssigneeName = item.toString ?? undefined;
+        }
+        if (
+          item.field === 'status' &&
+          (item.toString ?? '').toLowerCase() === 'testing'
+        ) {
+          result = {
+            sentToQaAt: new Date(entry.created),
+            qaRequestedById: entry.author?.accountId,
+            qaRequestedByName: entry.author?.displayName,
+            previousAssigneeId: currentAssigneeId,
+            previousAssigneeName: currentAssigneeName,
+          };
+        }
+      }
+    }
+
+    return result;
+  }
+
   async sync(projectId: string, userId: string) {
     const project = await this.getProjectOrThrow(projectId);
 
@@ -212,7 +396,7 @@ export class JiraService {
     const requestBody = {
       jql,
       maxResults: 100,
-      fields: ['summary', 'status', 'assignee', 'updated', 'key'],
+      fields: ['summary', 'description', 'status', 'assignee', 'updated', 'key'],
     };
 
     this.logger.log(
@@ -252,31 +436,45 @@ export class JiraService {
     }
 
     const syncedTasks = await Promise.all(
-      issues.map((issue) =>
-        this.prisma.jiraTask.upsert({
+      issues.map(async (issue) => {
+        let handoff: ReturnType<typeof this.deriveQaHandoff> = {};
+        try {
+          const changelog = await this.getChangelog(project, issue.key);
+          handoff = this.deriveQaHandoff(changelog);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to fetch/parse changelog for ${issue.key}: ${String(error)}`,
+          );
+        }
+
+        return this.prisma.jiraTask.upsert({
           where: { projectId_jiraKey: { projectId, jiraKey: issue.key } },
           create: {
             projectId,
             jiraKey: issue.key,
             title: issue.fields?.summary ?? 'No title',
+            description: issue.fields?.description ?? null,
             currentStatus: issue.fields?.status?.name ?? 'Unknown',
             currentAssignee: issue.fields?.assignee?.displayName ?? 'Unassigned',
             jiraUrl: `${project.jiraBaseUrl!.replace(/\/+$/, '')}/browse/${issue.key}`,
             jiraUpdatedAt: new Date(
               issue.fields?.updated ?? new Date().toISOString(),
             ),
+            ...handoff,
           },
           update: {
             title: issue.fields?.summary ?? 'No title',
+            description: issue.fields?.description ?? null,
             currentStatus: issue.fields?.status?.name ?? 'Unknown',
             currentAssignee: issue.fields?.assignee?.displayName ?? 'Unassigned',
             jiraUpdatedAt: new Date(
               issue.fields?.updated ?? new Date().toISOString(),
             ),
             syncedAt: new Date(),
+            ...handoff,
           },
-        }),
-      ),
+        });
+      }),
     );
 
     await this.activityLogs.log({
@@ -291,6 +489,53 @@ export class JiraService {
     return { syncedCount: syncedTasks.length, tasks: syncedTasks };
   }
 
+  /** Batches qaStatus derivation for a page of tasks (no per-row queries). */
+  private async attachQaStatus<T extends { id: string }>(
+    tasks: T[],
+  ): Promise<(T & { qaStatus: QaStatus })[]> {
+    const taskIds = tasks.map((t) => t.id);
+    if (taskIds.length === 0) return tasks as (T & { qaStatus: QaStatus })[];
+
+    const [submissions, runCounts] = await Promise.all([
+      this.prisma.qaSubmission.findMany({
+        where: { jiraTaskId: { in: taskIds } },
+        orderBy: { submittedAt: 'desc' },
+        select: { jiraTaskId: true, overallStatus: true },
+      }),
+      this.prisma.testRun.groupBy({
+        by: ['testCaseId'],
+        where: { testCase: { jiraTaskId: { in: taskIds } } },
+        _count: true,
+      }),
+    ]);
+
+    const latestSubmissionByTask = new Map<string, QaOverallStatus>();
+    for (const submission of submissions) {
+      if (!latestSubmissionByTask.has(submission.jiraTaskId)) {
+        latestSubmissionByTask.set(submission.jiraTaskId, submission.overallStatus);
+      }
+    }
+
+    const testCases = await this.prisma.testCase.findMany({
+      where: { jiraTaskId: { in: taskIds } },
+      select: { id: true, jiraTaskId: true },
+    });
+    const hasRunTaskIds = new Set(
+      testCases
+        .filter((tc) => runCounts.some((r) => r.testCaseId === tc.id))
+        .map((tc) => tc.jiraTaskId as string),
+    );
+
+    return tasks.map((task) => {
+      const latest = latestSubmissionByTask.get(task.id);
+      let qaStatus: QaStatus = 'NOT_STARTED';
+      if (latest === QaOverallStatus.PASS) qaStatus = 'SUBMITTED';
+      else if (latest === QaOverallStatus.FAIL) qaStatus = 'FAILED';
+      else if (hasRunTaskIds.has(task.id)) qaStatus = 'IN_PROGRESS';
+      return { ...task, qaStatus };
+    });
+  }
+
   async listTasks(
     projectId: string,
     userId: string,
@@ -300,8 +545,18 @@ export class JiraService {
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const where = {
+    const where: Prisma.JiraTaskWhereInput = {
       projectId,
+      ...(query.status && { currentStatus: query.status }),
+      ...(query.qaRequestedByName && {
+        qaRequestedByName: query.qaRequestedByName,
+      }),
+      ...((query.dateFrom || query.dateTo) && {
+        sentToQaAt: {
+          ...(query.dateFrom && { gte: new Date(query.dateFrom) }),
+          ...(query.dateTo && { lte: new Date(query.dateTo) }),
+        },
+      }),
       ...(query.search && {
         OR: [
           { title: { contains: query.search, mode: 'insensitive' as const } },
@@ -327,7 +582,9 @@ export class JiraService {
     });
     const viewByTaskId = new Map(views.map((v) => [v.jiraTaskId, v]));
 
-    const data = tasks.map((task) => ({
+    const withQaStatus = await this.attachQaStatus(tasks);
+
+    const data = withQaStatus.map((task) => ({
       ...task,
       unseen: this.isUnseen(
         task.jiraUpdatedAt,
@@ -353,8 +610,12 @@ export class JiraService {
     const view = await this.prisma.jiraTaskView.findUnique({
       where: { jiraTaskId_userId: { jiraTaskId: taskId, userId } },
     });
+    const [withQaStatus] = await this.attachQaStatus([task]);
 
-    return { ...task, unseen: this.isUnseen(task.jiraUpdatedAt, view?.seenAt) };
+    return {
+      ...withQaStatus,
+      unseen: this.isUnseen(task.jiraUpdatedAt, view?.seenAt),
+    };
   }
 
   async markSeen(projectId: string, taskId: string, userId: string) {
@@ -374,6 +635,288 @@ export class JiraService {
       create: { jiraTaskId: taskId, userId },
       update: { seenAt: new Date() },
     });
+  }
+
+  async getTaskTransitions(projectId: string, taskId: string) {
+    await this.getProjectOrThrow(projectId);
+    const task = await this.prisma.jiraTask.findFirst({
+      where: { id: taskId, projectId },
+    });
+    if (!task) {
+      throw new NotFoundException(
+        `Jira task with id ${taskId} not found in this project`,
+      );
+    }
+    const transitions = await this.getTransitions(projectId, task.jiraKey);
+    const suggestedInProgressId =
+      this.pickInProgressTransition(transitions)?.id ?? null;
+    return { transitions, suggestedInProgressId };
+  }
+
+  private buildQaSubmissionComment(
+    overallStatus: QaOverallStatus,
+    testRuns: Array<{
+      status: string;
+      actualResult: string | null;
+      testCase: { title: string };
+    }>,
+    submitterName: string,
+    date: Date,
+  ): string {
+    const passCount = testRuns.filter((r) => r.status === 'PASS').length;
+    const failCount = testRuns.filter((r) => r.status === 'FAIL').length;
+    const total = testRuns.length;
+
+    if (overallStatus === QaOverallStatus.PASS) {
+      const lines = [
+        '✅ QA Approved',
+        `Tested by: ${submitterName} | ${date.toLocaleDateString()}`,
+        '',
+        'Test Summary:',
+        ...testRuns.map((r) => `✅ ${r.testCase.title} — PASS`),
+        '',
+        `All ${total} test cases passed successfully.`,
+        'Status changed to: Approved',
+      ];
+      return lines.join('\n');
+    }
+
+    const lines = [
+      '❌ QA Failed — Returned for fixes',
+      `Tested by: ${submitterName} | ${date.toLocaleDateString()}`,
+      '',
+      'Test Results:',
+      ...testRuns.flatMap((r) => {
+        if (r.status === 'FAIL') {
+          return [
+            `❌ ${r.testCase.title} — FAIL`,
+            `   Issue: ${r.actualResult ?? 'N/A'}`,
+          ];
+        }
+        return [`✅ ${r.testCase.title} — PASS`];
+      }),
+      '',
+      `${failCount} of ${total} test cases failed.`,
+      'Please review the issues above and fix before resubmitting.',
+    ];
+    return lines.join('\n');
+  }
+
+  async submitQaResult(
+    projectId: string,
+    taskId: string,
+    dto: SubmitQaResultDto,
+    userId: string,
+  ) {
+    await this.getProjectOrThrow(projectId);
+    const jiraTask = await this.prisma.jiraTask.findFirst({
+      where: { id: taskId, projectId },
+    });
+    if (!jiraTask) {
+      throw new NotFoundException(
+        `Jira task with id ${taskId} not found in this project`,
+      );
+    }
+
+    const testRuns = await this.prisma.testRun.findMany({
+      where: { id: { in: dto.testRunIds } },
+      include: {
+        testCase: { select: { id: true, title: true, jiraTaskId: true } },
+        executor: { select: { id: true, name: true } },
+      },
+    });
+
+    if (testRuns.length === 0) {
+      throw new BadRequestException('No test runs provided');
+    }
+    if (testRuns.some((run) => run.testCase.jiraTaskId !== taskId)) {
+      throw new BadRequestException(
+        'All test runs must belong to test cases linked to this Jira task',
+      );
+    }
+
+    const passCount = testRuns.filter((r) => r.status === 'PASS').length;
+    const failCount = testRuns.filter((r) => r.status === 'FAIL').length;
+    const totalCount = testRuns.length;
+
+    const submitter = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    const submittedAt = new Date();
+    const commentBody = this.buildQaSubmissionComment(
+      dto.overallStatus,
+      testRuns,
+      submitter?.name ?? 'Unknown',
+      submittedAt,
+    );
+
+    const jiraKey = jiraTask.jiraKey;
+    let labelAdded: string | null = null;
+
+    await this.addComment(projectId, jiraKey, commentBody);
+
+    if (dto.overallStatus === QaOverallStatus.PASS) {
+      await this.addLabel(projectId, jiraKey, 'QA-Approved');
+      labelAdded = 'QA-Approved';
+
+      const transitions = await this.getTransitions(projectId, jiraKey);
+      const target = this.pickPassTransition(transitions);
+      if (target) {
+        await this.transitionIssue(projectId, jiraKey, target.id);
+      } else {
+        this.logger.warn(
+          `No matching "done-like" transition found for ${jiraKey}; leaving status unchanged`,
+        );
+      }
+    } else {
+      if (!dto.transitionId) {
+        throw new BadRequestException(
+          'transitionId is required when overallStatus is FAIL',
+        );
+      }
+      await this.transitionIssue(projectId, jiraKey, dto.transitionId);
+
+      const reassignTo = dto.jiraAssigneeId ?? jiraTask.previousAssigneeId;
+      if (reassignTo) {
+        await this.reassignIssue(projectId, jiraKey, reassignTo);
+      } else {
+        this.logger.warn(
+          `No assignee available to reassign ${jiraKey} to (no jiraAssigneeId and no previousAssigneeId)`,
+        );
+      }
+    }
+
+    const jiraStatusAfter = await this.getIssueStatus(projectId, jiraKey);
+
+    const submission = await this.prisma.qaSubmission.create({
+      data: {
+        jiraTaskId: taskId,
+        projectId,
+        overallStatus: dto.overallStatus,
+        passCount,
+        failCount,
+        totalCount,
+        jiraComment: commentBody,
+        labelAdded,
+        jiraStatusAfter,
+        submittedBy: userId,
+        submittedAt,
+      },
+      include: {
+        jiraTask: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    await this.activityLogs.log({
+      userId,
+      projectId,
+      action: 'CREATE',
+      entityType: 'QA_SUBMISSION',
+      entityId: submission.id,
+      newValue: submission,
+    });
+
+    return submission;
+  }
+
+  async getQaOverview(
+    projectId: string,
+    filters: {
+      qaRequestedByName?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      search?: string;
+    },
+  ) {
+    await this.getProjectOrThrow(projectId);
+
+    const readyWhere: Prisma.JiraTaskWhereInput = {
+      projectId,
+      currentStatus: 'Testing',
+      ...(filters.qaRequestedByName && {
+        qaRequestedByName: filters.qaRequestedByName,
+      }),
+      ...(filters.search && {
+        OR: [
+          { title: { contains: filters.search, mode: 'insensitive' as const } },
+          { jiraKey: { contains: filters.search, mode: 'insensitive' as const } },
+        ],
+      }),
+      ...((filters.dateFrom || filters.dateTo) && {
+        sentToQaAt: {
+          ...(filters.dateFrom && { gte: new Date(filters.dateFrom) }),
+          ...(filters.dateTo && { lte: new Date(filters.dateTo) }),
+        },
+      }),
+    };
+
+    const readyTasks = await this.prisma.jiraTask.findMany({
+      where: readyWhere,
+      orderBy: { sentToQaAt: 'desc' },
+    });
+
+    const testCaseCounts = await this.prisma.testCase.groupBy({
+      by: ['jiraTaskId'],
+      where: { jiraTaskId: { in: readyTasks.map((t) => t.id) } },
+      _count: true,
+    });
+    const testCaseCountByTask = new Map(
+      testCaseCounts.map((c) => [c.jiraTaskId as string, c._count]),
+    );
+
+    const readyForTesting = readyTasks.map((task) => ({
+      ...task,
+      testCasesCount: testCaseCountByTask.get(task.id) ?? 0,
+    }));
+
+    const allTasks = await this.prisma.jiraTask.findMany({
+      where: { projectId },
+      include: { testCases: { select: { id: true } } },
+    });
+    const submittedTaskIds = new Set(
+      (
+        await this.prisma.qaSubmission.findMany({
+          where: { projectId },
+          select: { jiraTaskId: true },
+        })
+      ).map((s) => s.jiraTaskId),
+    );
+    const allTestCaseIds = allTasks.flatMap((t) => t.testCases.map((tc) => tc.id));
+    const runCounts = await this.prisma.testRun.groupBy({
+      by: ['testCaseId'],
+      where: { testCaseId: { in: allTestCaseIds } },
+      _count: true,
+    });
+    const testCaseIdsWithRuns = new Set(runCounts.map((r) => r.testCaseId));
+
+    const inProgress = allTasks
+      .filter((task) => !submittedTaskIds.has(task.id) && task.testCases.length > 0)
+      .map((task) => {
+        const completedCount = task.testCases.filter((tc) =>
+          testCaseIdsWithRuns.has(tc.id),
+        ).length;
+        return {
+          task,
+          testCasesCount: task.testCases.length,
+          completedCount,
+        };
+      })
+      .filter((entry) => entry.completedCount > 0);
+
+    const recentlyCompleted = await this.prisma.qaSubmission.findMany({
+      where: { projectId },
+      orderBy: { submittedAt: 'desc' },
+      take: 5,
+      include: {
+        jiraTask: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    return { readyForTesting, inProgress, recentlyCompleted };
   }
 
   private isUnseen(
