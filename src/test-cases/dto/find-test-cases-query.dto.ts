@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import {
   Platform,
@@ -8,9 +8,10 @@ import {
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 export class FindTestCasesQueryDto extends PaginationQueryDto {
-  @ApiProperty({ example: 'a3f1c2e4-1234-4abc-9def-0123456789ab' })
+  @ApiPropertyOptional({ example: 'a3f1c2e4-1234-4abc-9def-0123456789ab' })
+  @IsOptional()
   @IsUUID()
-  projectId: string;
+  projectId?: string;
 
   @ApiPropertyOptional({ enum: Platform })
   @IsOptional()

@@ -76,6 +76,10 @@ export interface TestCase {
   createdAt: string
   creator: UserSummary
   jiraTask: JiraTaskSummary | null
+  project: {
+    id: string
+    name: string
+  }
 }
 
 export interface TestCaseDetail extends TestCase {

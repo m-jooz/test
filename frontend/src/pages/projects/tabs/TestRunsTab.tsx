@@ -60,13 +60,13 @@ export default function TestRunsTab({ projectId }: TestRunsTabProps) {
 
   const testRunQueries = useQueries({
     queries: (testCases ?? []).map((testCase) => ({
-      queryKey: ['test-runs', testCase.id],
+      queryKey: ['test-runs', testCase.id, 'all'],
       queryFn: async () => {
-        const { data } = await api.get<ApiResponse<TestRun[]>>(
+        const { data } = await api.get<ApiResponse<PaginatedResult<TestRun>>>(
           '/test-runs',
-          { params: { testCaseId: testCase.id } },
+          { params: { testCaseId: testCase.id, limit: 100 } },
         )
-        return data.data
+        return data.data.data
       },
       enabled: Boolean(testCases),
     })),

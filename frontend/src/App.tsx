@@ -10,9 +10,12 @@ const ProjectsPage = lazy(() => import('./pages/projects/ProjectsPage'))
 const ProjectDetailPage = lazy(
   () => import('./pages/projects/ProjectDetailPage'),
 )
+const TestCasesPage = lazy(() => import('./pages/test-cases/TestCasesPage'))
 const TestCaseDetailPage = lazy(
   () => import('./pages/test-cases/TestCaseDetailPage'),
 )
+const TestRunsPage = lazy(() => import('./pages/test-runs/TestRunsPage'))
+const ReportsPage = lazy(() => import('./pages/reports/ReportsPage'))
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'))
 const UsersPage = lazy(() => import('./pages/users/UsersPage'))
 const ReportSharePage = lazy(() => import('./pages/reports/ReportSharePage'))
@@ -38,10 +41,13 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
+              <Route path="/test-cases" element={<TestCasesPage />} />
               <Route
                 path="/test-cases/:id"
                 element={<TestCaseDetailPage />}
               />
+              <Route path="/test-runs" element={<TestRunsPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
 
               <Route element={<AdminRoute />}>

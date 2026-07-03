@@ -22,6 +22,7 @@ const testCaseInclude = {
       jiraUrl: true,
     },
   },
+  project: { select: { id: true, name: true } },
 } as const;
 
 @Injectable()
@@ -87,13 +88,15 @@ export class TestCasesService {
   }
 
   async findByProject(query: FindTestCasesQueryDto) {
-    await this.assertProjectExists(query.projectId);
+    if (query.projectId) {
+      await this.assertProjectExists(query.projectId);
+    }
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
     const where: Prisma.TestCaseWhereInput = {
-      projectId: query.projectId,
+      ...(query.projectId && { projectId: query.projectId }),
       ...(query.platform && { platform: query.platform }),
       ...(query.priority && { priority: query.priority }),
       ...(query.type && { type: query.type }),
@@ -119,10 +122,7 @@ export class TestCasesService {
   async findOne(id: string) {
     const testCase = await this.prisma.testCase.findUnique({
       where: { id },
-      include: {
-        ...testCaseInclude,
-        project: { select: { id: true, name: true } },
-      },
+      include: testCaseInclude,
     });
 
     if (!testCase) {
