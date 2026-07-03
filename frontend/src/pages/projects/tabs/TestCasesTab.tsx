@@ -12,7 +12,6 @@ import TableSkeleton from '../components/TableSkeleton'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import NewTestCaseModal from '../modals/NewTestCaseModal'
-import RunTestModal from '../modals/RunTestModal'
 
 interface TestCasesTabProps {
   projectId: string
@@ -43,7 +42,6 @@ export default function TestCasesTab({ projectId }: TestCasesTabProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
-  const [runTestCaseId, setRunTestCaseId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [platform, setPlatform] = useState('')
@@ -95,6 +93,10 @@ export default function TestCasesTab({ projectId }: TestCasesTabProps) {
 
   return (
     <div>
+      <div className="mb-4 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2.5 text-sm text-indigo-300">
+        {t('testCases.runNoticeBanner')}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -218,24 +220,13 @@ export default function TestCasesTab({ projectId }: TestCasesTabProps) {
                       {testCase.jiraTask?.jiraKey ?? '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setRunTestCaseId(testCase.id)}
-                          className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-500"
-                        >
-                          {t('testCases.run')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate(`/test-cases/${testCase.id}`)
-                          }
-                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500"
-                        >
-                          {t('common.view')}
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/test-cases/${testCase.id}`)}
+                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500"
+                      >
+                        {t('common.view')}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -254,13 +245,6 @@ export default function TestCasesTab({ projectId }: TestCasesTabProps) {
         <NewTestCaseModal
           projectId={projectId}
           onClose={() => setIsNewModalOpen(false)}
-        />
-      )}
-
-      {runTestCaseId && (
-        <RunTestModal
-          testCaseId={runTestCaseId}
-          onClose={() => setRunTestCaseId(null)}
         />
       )}
     </div>

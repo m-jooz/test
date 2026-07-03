@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import api from '../../api/client'
+import { invalidateQaData } from '../../lib/invalidateQaData'
 import type { ApiResponse, Project } from '../../types'
 
 function buildProjectSchema(isEditMode: boolean, t: (key: string) => string) {
@@ -72,7 +73,7 @@ export default function NewProjectModal({
         : api.post<ApiResponse<Project>>('/projects', payload)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      invalidateQaData(queryClient)
       if (isEditMode) {
         queryClient.invalidateQueries({ queryKey: ['project', project!.id] })
       }

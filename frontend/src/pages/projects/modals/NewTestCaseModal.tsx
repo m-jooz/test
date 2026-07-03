@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import api from '../../../api/client'
+import { invalidateQaData } from '../../../lib/invalidateQaData'
 import type {
   ApiResponse,
   JiraTask,
@@ -87,7 +88,7 @@ export default function NewTestCaseModal({
         jiraTaskId: values.jiraTaskId || undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['test-cases', projectId] })
+      invalidateQaData(queryClient)
       toast.success(t('testCases.testCaseCreated'))
       onClose()
     },

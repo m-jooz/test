@@ -12,6 +12,7 @@ import { ReportsService } from './reports.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { GenerateReportDto } from './dto/generate-report.dto';
 import { FindReportsQueryDto } from './dto/find-reports-query.dto';
+import { FindSubmissionsQueryDto } from './dto/find-submissions-query.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -47,6 +48,39 @@ export class ReportsController {
   })
   findByShareToken(@Param('shareToken') shareToken: string) {
     return this.reportsService.findByShareToken(shareToken);
+  }
+
+  @Get('submissions/stats')
+  @ApiOperation({ summary: 'Aggregate stats for QA submissions matching filters' })
+  getSubmissionStats(@Query() query: FindSubmissionsQueryDto) {
+    return this.reportsService.getSubmissionStats(query);
+  }
+
+  @Public()
+  @Get('submissions/share/:shareToken')
+  @ApiOperation({
+    summary: 'Publicly fetch a QA submission by its share token (no auth required)',
+  })
+  getSubmissionByShareToken(@Param('shareToken') shareToken: string) {
+    return this.reportsService.getSubmissionByShareToken(shareToken);
+  }
+
+  @Get('submissions/:id')
+  @ApiOperation({ summary: 'Get full detail for a single QA submission' })
+  getSubmissionDetail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.reportsService.getSubmissionDetail(id);
+  }
+
+  @Post('submissions/:id/share')
+  @ApiOperation({ summary: 'Generate (or return existing) share link for a QA submission' })
+  shareSubmission(@Param('id', ParseUUIDPipe) id: string) {
+    return this.reportsService.shareSubmission(id);
+  }
+
+  @Get('submissions')
+  @ApiOperation({ summary: 'List QA submissions for a project with filters (paginated)' })
+  findSubmissions(@Query() query: FindSubmissionsQueryDto) {
+    return this.reportsService.findSubmissions(query);
   }
 
   @Get()

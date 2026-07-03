@@ -180,6 +180,15 @@ export default function DashboardPage() {
                   <EmptyState
                     icon={PlayCircle}
                     title={t('dashboard.noTasksReady')}
+                    action={
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/projects/${projectId}`)}
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-500"
+                      >
+                        {t('dashboard.goToJiraTasks')}
+                      </button>
+                    }
                   />
                 ) : (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

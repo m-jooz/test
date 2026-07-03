@@ -396,7 +396,16 @@ export class JiraService {
     const requestBody = {
       jql,
       maxResults: 100,
-      fields: ['summary', 'description', 'status', 'assignee', 'updated', 'key'],
+      fields: [
+        'summary',
+        'description',
+        'status',
+        'assignee',
+        'reporter',
+        'priority',
+        'updated',
+        'key',
+      ],
     };
 
     this.logger.log(
@@ -456,6 +465,8 @@ export class JiraService {
             description: issue.fields?.description ?? null,
             currentStatus: issue.fields?.status?.name ?? 'Unknown',
             currentAssignee: issue.fields?.assignee?.displayName ?? 'Unassigned',
+            currentReporter: issue.fields?.reporter?.displayName ?? null,
+            priority: issue.fields?.priority?.name ?? null,
             jiraUrl: `${project.jiraBaseUrl!.replace(/\/+$/, '')}/browse/${issue.key}`,
             jiraUpdatedAt: new Date(
               issue.fields?.updated ?? new Date().toISOString(),
@@ -467,6 +478,8 @@ export class JiraService {
             description: issue.fields?.description ?? null,
             currentStatus: issue.fields?.status?.name ?? 'Unknown',
             currentAssignee: issue.fields?.assignee?.displayName ?? 'Unassigned',
+            currentReporter: issue.fields?.reporter?.displayName ?? null,
+            priority: issue.fields?.priority?.name ?? null,
             jiraUpdatedAt: new Date(
               issue.fields?.updated ?? new Date().toISOString(),
             ),
@@ -701,24 +714,9 @@ export class JiraService {
     return lines.join('\n');
   }
 
-  async submitQaResult(
-    projectId: string,
-    taskId: string,
-    dto: SubmitQaResultDto,
-    userId: string,
-  ) {
-    await this.getProjectOrThrow(projectId);
-    const jiraTask = await this.prisma.jiraTask.findFirst({
-      where: { id: taskId, projectId },
-    });
-    if (!jiraTask) {
-      throw new NotFoundException(
-        `Jira task with id ${taskId} not found in this project`,
-      );
-    }
-
+  private async loadAndValidateTestRuns(taskId: string, testRunIds: string[]) {
     const testRuns = await this.prisma.testRun.findMany({
-      where: { id: { in: dto.testRunIds } },
+      where: { id: { in: testRunIds } },
       include: {
         testCase: { select: { id: true, title: true, jiraTaskId: true } },
         executor: { select: { id: true, name: true } },
@@ -733,6 +731,66 @@ export class JiraService {
         'All test runs must belong to test cases linked to this Jira task',
       );
     }
+    return testRuns;
+  }
+
+  private async getJiraTaskInProjectOrThrow(projectId: string, taskId: string) {
+    const jiraTask = await this.prisma.jiraTask.findFirst({
+      where: { id: taskId, projectId },
+    });
+    if (!jiraTask) {
+      throw new NotFoundException(
+        `Jira task with id ${taskId} not found in this project`,
+      );
+    }
+    return jiraTask;
+  }
+
+  /** Builds the exact comment that would be posted to Jira, without posting anything. */
+  async previewQaSubmissionComment(
+    projectId: string,
+    taskId: string,
+    testRunIds: string[],
+    overallStatus: QaOverallStatus,
+    userId: string,
+  ) {
+    await this.getProjectOrThrow(projectId);
+    await this.getJiraTaskInProjectOrThrow(projectId, taskId);
+    const testRuns = await this.loadAndValidateTestRuns(taskId, testRunIds);
+
+    const submitter = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    const comment = this.buildQaSubmissionComment(
+      overallStatus,
+      testRuns,
+      submitter?.name ?? 'Unknown',
+      new Date(),
+    );
+
+    return {
+      comment,
+      passCount: testRuns.filter((r) => r.status === 'PASS').length,
+      failCount: testRuns.filter((r) => r.status === 'FAIL').length,
+      totalCount: testRuns.length,
+    };
+  }
+
+  async submitQaResult(
+    projectId: string,
+    taskId: string,
+    dto: SubmitQaResultDto,
+    userId: string,
+  ) {
+    await this.getProjectOrThrow(projectId);
+    const jiraTask = await this.getJiraTaskInProjectOrThrow(projectId, taskId);
+
+    const testRuns = await this.loadAndValidateTestRuns(
+      taskId,
+      dto.testRunIds,
+    );
 
     const passCount = testRuns.filter((r) => r.status === 'PASS').length;
     const failCount = testRuns.filter((r) => r.status === 'FAIL').length;
@@ -744,12 +802,14 @@ export class JiraService {
     });
 
     const submittedAt = new Date();
-    const commentBody = this.buildQaSubmissionComment(
-      dto.overallStatus,
-      testRuns,
-      submitter?.name ?? 'Unknown',
-      submittedAt,
-    );
+    const commentBody =
+      dto.commentOverride?.trim() ||
+      this.buildQaSubmissionComment(
+        dto.overallStatus,
+        testRuns,
+        submitter?.name ?? 'Unknown',
+        submittedAt,
+      );
 
     const jiraKey = jiraTask.jiraKey;
     let labelAdded: string | null = null;
@@ -800,6 +860,7 @@ export class JiraService {
         jiraComment: commentBody,
         labelAdded,
         jiraStatusAfter,
+        testRunIds: dto.testRunIds,
         submittedBy: userId,
         submittedAt,
       },

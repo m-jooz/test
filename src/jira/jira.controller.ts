@@ -15,6 +15,7 @@ import { Role } from '../generated/prisma/enums.js';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { FindJiraTasksQueryDto } from './dto/find-jira-tasks-query.dto';
 import { SubmitQaResultDto } from './dto/submit-qa-result.dto';
+import { PreviewQaSubmissionDto } from './dto/preview-qa-submission.dto';
 import { QaOverviewQueryDto } from './dto/qa-overview-query.dto';
 
 @ApiTags('jira')
@@ -78,6 +79,25 @@ export class JiraController {
     @Param('taskId', ParseUUIDPipe) taskId: string,
   ) {
     return this.jiraService.getTaskTransitions(projectId, taskId);
+  }
+
+  @Post(':projectId/tasks/:taskId/submit/preview')
+  @ApiOperation({
+    summary: 'Preview the Jira comment that would be posted, without submitting',
+  })
+  previewQaSubmission(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @Body() dto: PreviewQaSubmissionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.jiraService.previewQaSubmissionComment(
+      projectId,
+      taskId,
+      dto.testRunIds,
+      dto.overallStatus,
+      user.id,
+    );
   }
 
   @Post(':projectId/tasks/:taskId/submit')

@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import api from '../../../api/client'
+import { invalidateQaData } from '../../../lib/invalidateQaData'
 
 function buildRejectBugSchema(t: (key: string) => string) {
   return z.object({
@@ -39,7 +40,7 @@ export default function RejectBugModal({
     mutationFn: (values: RejectBugFormValues) =>
       api.patch(`/test-runs/${testRunId}/bug/reject`, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['test-runs'] })
+      invalidateQaData(queryClient)
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success(t('testRuns.bugRejectedToast'))
       onClose()

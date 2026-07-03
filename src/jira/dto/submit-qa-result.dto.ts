@@ -30,4 +30,12 @@ export class SubmitQaResultDto {
   @ValidateIf((dto: SubmitQaResultDto) => dto.overallStatus === QaOverallStatus.FAIL)
   @IsString()
   transitionId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Edited comment text to post instead of the auto-generated one (from the preview endpoint)',
+  })
+  @IsOptional()
+  @IsString()
+  commentOverride?: string;
 }

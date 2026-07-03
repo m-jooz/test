@@ -13,6 +13,7 @@ import {
 import toast from 'react-hot-toast'
 import api from '../../api/client'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { invalidateQaData } from '../../lib/invalidateQaData'
 import { useAuthStore } from '../../store/auth.store'
 import type { ApiResponse, PaginatedResult, Project } from '../../types'
 import Pagination from '../../components/Pagination'
@@ -148,7 +149,7 @@ export default function ProjectsPage() {
   const { mutate: deleteProject, isPending: isDeleting } = useMutation({
     mutationFn: (projectId: string) => api.delete(`/projects/${projectId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      invalidateQaData(queryClient)
       toast.success(t('projects.projectDeleted'))
       setDeletingProject(null)
     },

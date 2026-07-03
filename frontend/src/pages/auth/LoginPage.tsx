@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useTranslation } from 'react-i18next'
 import api from '../../api/client'
 import { useAuthStore } from '../../store/auth.store'
+import { getLandingPath } from '../../lib/getLandingPath'
 import type { ApiResponse, User } from '../../types'
 
 function buildLoginSchema(t: (key: string) => string) {
@@ -46,7 +47,7 @@ export default function LoginPage() {
         values,
       )
       login(data.data.user, data.data.accessToken)
-      navigate('/dashboard', { replace: true })
+      navigate(getLandingPath(data.data.user.role), { replace: true })
     } catch (error: any) {
       const message =
         error.response?.data?.message ?? t('auth.loginFailed')

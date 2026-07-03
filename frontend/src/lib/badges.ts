@@ -49,6 +49,15 @@ export const QA_OVERALL_STATUS_BADGE: Record<'PASS' | 'FAIL', string> = {
   FAIL: 'bg-red-500/10 text-red-400 border border-red-500/30',
 }
 
+export const BUG_STATUS_BADGE: Record<
+  'PENDING' | 'APPROVED' | 'REJECTED',
+  string
+> = {
+  PENDING: 'bg-orange-500/10 text-orange-400 border border-orange-500/30',
+  APPROVED: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30',
+  REJECTED: 'bg-red-500/10 text-red-400 border border-red-500/30',
+}
+
 export function jiraStatusBadgeClass(status: string | null): string {
   const normalized = (status ?? '').toLowerCase()
   if (normalized.includes('done') || normalized.includes('closed')) {

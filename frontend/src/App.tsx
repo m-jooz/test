@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import Layout from './components/Layout'
+import { useAuthStore } from './store/auth.store'
+import { getLandingPath } from './lib/getLandingPath'
 
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
@@ -27,6 +29,11 @@ function PageFallback() {
       Loading…
     </div>
   )
+}
+
+function RootRedirect() {
+  const user = useAuthStore((state) => state.user)
+  return <Navigate to={user ? getLandingPath(user.role) : '/login'} replace />
 }
 
 export default function App() {
@@ -61,8 +68,8 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<RootRedirect />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

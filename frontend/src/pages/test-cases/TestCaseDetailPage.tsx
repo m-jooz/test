@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ExternalLink, Play } from 'lucide-react'
+import { ArrowLeft, ExternalLink, PlayCircle } from 'lucide-react'
 import api from '../../api/client'
-import { PLATFORM_BADGE, PRIORITY_BADGE, TEST_RUN_STATUS_BADGE } from '../../lib/badges'
+import { BUG_STATUS_BADGE, PLATFORM_BADGE, PRIORITY_BADGE, TEST_RUN_STATUS_BADGE } from '../../lib/badges'
 import type {
   ApiResponse,
   PaginatedResult,
@@ -15,7 +15,6 @@ import ErrorState from '../projects/components/ErrorState'
 import EmptyState from '../projects/components/EmptyState'
 import TableSkeleton from '../projects/components/TableSkeleton'
 import Pagination from '../../components/Pagination'
-import RunTestModal from '../projects/modals/RunTestModal'
 
 const TYPE_BADGE: Record<TestCaseDetail['type'], string> = {
   MANUAL: 'bg-gray-500/10 text-gray-300 border border-gray-500/30',
@@ -36,17 +35,20 @@ function InfoCard({ label, value }: { label: string; value: string }) {
 
 function BugCell({ testRun }: { testRun: TestRun }) {
   const { t } = useTranslation()
-  if (!testRun.isBug) return <span className="text-gray-500">-</span>
-  if (testRun.bugStatus === 'PENDING') {
-    return <span className="text-orange-400">🐛 {t('testRuns.bugPending')}</span>
-  }
-  if (testRun.bugStatus === 'APPROVED') {
-    return <span className="text-green-400">✅ {t('testRuns.bugApproved')}</span>
-  }
-  if (testRun.bugStatus === 'REJECTED') {
-    return <span className="text-red-400">❌ {t('testRuns.bugRejected')}</span>
-  }
-  return <span className="text-gray-500">-</span>
+  if (!testRun.isBug || !testRun.bugStatus) return <span className="text-gray-500">-</span>
+  const label =
+    testRun.bugStatus === 'PENDING'
+      ? `🐛 ${t('testRuns.bugPending')}`
+      : testRun.bugStatus === 'APPROVED'
+        ? `✅ ${t('testRuns.bugApproved')}`
+        : `❌ ${t('testRuns.bugRejected')}`
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${BUG_STATUS_BADGE[testRun.bugStatus]}`}
+    >
+      {label}
+    </span>
+  )
 }
 
 function truncate(text: string | null, length: number): string {
@@ -58,7 +60,6 @@ export default function TestCaseDetailPage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [isRunModalOpen, setIsRunModalOpen] = useState(false)
   const [runsPage, setRunsPage] = useState(1)
 
   useEffect(() => {
@@ -168,15 +169,10 @@ export default function TestCaseDetailPage() {
                 </span>
               )}
             </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => setIsRunModalOpen(true)}
-              className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-500"
-            >
-              <Play size={18} />
-              {t('testCases.run')}
-            </button>
+          <div className="mb-6 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2.5 text-sm text-indigo-300">
+            {t('testCases.runNoticeBanner')}
           </div>
 
           <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -227,7 +223,7 @@ export default function TestCaseDetailPage() {
 
             {!isLoadingRuns && !isErrorRuns && testRuns && testRuns.length === 0 && (
               <EmptyState
-                icon={Play}
+                icon={PlayCircle}
                 title={t('testCases.noTestRunsClickRunTest')}
               />
             )}
@@ -313,10 +309,6 @@ export default function TestCaseDetailPage() {
             </section>
           )}
         </>
-      )}
-
-      {isRunModalOpen && (
-        <RunTestModal testCaseId={id} onClose={() => setIsRunModalOpen(false)} />
       )}
     </div>
   )

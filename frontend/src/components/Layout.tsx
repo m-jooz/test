@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import toast from 'react-hot-toast'
 import {
   Bell,
   BarChart2,
@@ -10,11 +11,13 @@ import {
   LayoutDashboard,
   LogOut,
   PlayCircle,
+  RefreshCw,
   User as UserIcon,
   Users,
 } from 'lucide-react'
 import api from '../api/client'
 import { formatRelativeTime } from '../lib/formatRelativeTime'
+import { invalidateQaData } from '../lib/invalidateQaData'
 import { useAuthStore } from '../store/auth.store'
 import type { ApiResponse, Notification } from '../types'
 
@@ -37,11 +40,18 @@ export default function Layout() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
+  const isFetching = useIsFetching()
   const [isNotifOpen, setIsNotifOpen] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')
+  }
+
+  const handleRefresh = () => {
+    invalidateQaData(queryClient)
+    queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    toast.success(t('common.refreshed'))
   }
 
   const { data: notificationsData } = useQuery({
@@ -169,6 +179,14 @@ export default function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 flex-shrink-0 items-center justify-end gap-2 border-b border-gray-800 bg-gray-900 px-6">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            aria-label={t('common.refresh')}
+            className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white"
+          >
+            <RefreshCw size={18} className={isFetching > 0 ? 'animate-spin' : ''} />
+          </button>
           <button
             type="button"
             onClick={toggleLanguage}

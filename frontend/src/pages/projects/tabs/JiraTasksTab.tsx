@@ -8,6 +8,7 @@ import api from '../../../api/client'
 import { jiraStatusBadgeClass, QA_STATUS_BADGE } from '../../../lib/badges'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
+import { invalidateQaData } from '../../../lib/invalidateQaData'
 import type { ApiResponse, JiraTask, PaginatedResult } from '../../../types'
 import Pagination from '../../../components/Pagination'
 import TableSkeleton from '../components/TableSkeleton'
@@ -59,7 +60,7 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
   const { mutate: sync, isPending: isSyncing } = useMutation({
     mutationFn: () => api.post(`/jira/${projectId}/sync`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jira-tasks', projectId] })
+      invalidateQaData(queryClient)
       toast.success(t('jira.syncSuccess'))
     },
     onError: (error: any) => {

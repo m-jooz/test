@@ -130,6 +130,8 @@ model JiraTask {
   description      String?  @db.Text
   currentStatus    String?  @map("current_status")
   currentAssignee  String?  @map("current_assignee")
+  currentReporter  String?  @map("current_reporter")
+  priority         String?
   jiraUrl          String?  @map("jira_url")
   jiraUpdatedAt    DateTime? @map("jira_updated_at")
   syncedAt         DateTime @default(now()) @map("synced_at")
@@ -295,6 +297,8 @@ model QaSubmission {
   jiraComment     String           @db.Text @map("jira_comment")
   labelAdded      String?          @map("label_added")
   jiraStatusAfter String?          @map("jira_status_after")
+  testRunIds      String[]         @map("test_run_ids")
+  shareToken      String?          @unique @map("share_token")
   submittedBy     String           @map("submitted_by")
   submittedAt     DateTime         @default(now()) @map("submitted_at")
 

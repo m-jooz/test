@@ -3,7 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { PlayCircle } from 'lucide-react'
 import api from '../../../api/client'
-import { TEST_RUN_STATUS_BADGE } from '../../../lib/badges'
+import { BUG_STATUS_BADGE, TEST_RUN_STATUS_BADGE } from '../../../lib/badges'
 import { useAuthStore } from '../../../store/auth.store'
 import type {
   ApiResponse,
@@ -23,17 +23,20 @@ interface TestRunsTabProps {
 
 function BugCell({ testRun }: { testRun: TestRun }) {
   const { t } = useTranslation()
-  if (!testRun.isBug) return <span className="text-gray-500">-</span>
-  if (testRun.bugStatus === 'PENDING') {
-    return <span className="text-orange-400">🐛 {t('testRuns.bugPending')}</span>
-  }
-  if (testRun.bugStatus === 'APPROVED') {
-    return <span className="text-green-400">✅ {t('testRuns.bugApproved')}</span>
-  }
-  if (testRun.bugStatus === 'REJECTED') {
-    return <span className="text-red-400">❌ {t('testRuns.bugRejected')}</span>
-  }
-  return <span className="text-gray-500">-</span>
+  if (!testRun.isBug || !testRun.bugStatus) return <span className="text-gray-500">-</span>
+  const label =
+    testRun.bugStatus === 'PENDING'
+      ? `🐛 ${t('testRuns.bugPending')}`
+      : testRun.bugStatus === 'APPROVED'
+        ? `✅ ${t('testRuns.bugApproved')}`
+        : `❌ ${t('testRuns.bugRejected')}`
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${BUG_STATUS_BADGE[testRun.bugStatus]}`}
+    >
+      {label}
+    </span>
+  )
 }
 
 export default function TestRunsTab({ projectId }: TestRunsTabProps) {

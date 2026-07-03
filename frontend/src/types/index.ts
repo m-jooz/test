@@ -51,6 +51,8 @@ export interface JiraTask {
   description: string | null
   currentStatus: string | null
   currentAssignee: string | null
+  currentReporter: string | null
+  priority: string | null
   jiraUrl: string | null
   jiraUpdatedAt: string | null
   syncedAt: string
@@ -90,10 +92,49 @@ export interface QaSubmission {
   jiraComment: string
   labelAdded: string | null
   jiraStatusAfter: string | null
+  testRunIds: string[]
+  shareToken: string | null
   submittedBy: string
   submittedAt: string
   jiraTask: JiraTask
   user: UserSummary
+}
+
+export interface QaSubmissionSummary {
+  id: string
+  jiraTaskId: string
+  projectId: string
+  overallStatus: 'PASS' | 'FAIL'
+  passCount: number
+  failCount: number
+  totalCount: number
+  jiraComment: string
+  labelAdded: string | null
+  jiraStatusAfter: string | null
+  testRunIds: string[]
+  shareToken: string | null
+  submittedBy: string
+  submittedAt: string
+  jiraTask: { id: string; jiraKey: string; title: string }
+  user: UserSummary
+}
+
+export interface QaSubmissionDetail extends Omit<QaSubmissionSummary, 'jiraTask'> {
+  jiraTask: JiraTask
+  testRuns: {
+    id: string
+    status: 'PASS' | 'FAIL' | 'BLOCKED' | 'SKIPPED'
+    actualResult: string | null
+    testCase: { id: string; title: string }
+  }[]
+}
+
+export interface QaSubmissionStats {
+  totalTasksTested: number
+  totalPass: number
+  totalFail: number
+  passRatePct: number
+  avgTestsPerTask: number
 }
 
 export interface QaOverview {
