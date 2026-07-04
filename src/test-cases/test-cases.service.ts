@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { UpdateTestCaseDto } from './dto/update-test-case.dto';
 import { FindTestCasesQueryDto } from './dto/find-test-cases-query.dto';
 import { paginate } from '../common/dto/pagination-query.dto';
 import type { Prisma } from '../generated/prisma/client.js';
+import { Role } from '../generated/prisma/enums.js';
 
 const testCaseInclude = {
   creator: { select: { id: true, name: true, email: true } },
@@ -62,6 +64,18 @@ export class TestCasesService {
       throw new NotFoundException(`Test case with id ${id} not found`);
     }
     return testCase;
+  }
+
+  private assertCanModify(
+    existing: { createdBy: string },
+    userId: string,
+    role: Role,
+  ) {
+    if (role === Role.TESTER && existing.createdBy !== userId) {
+      throw new ForbiddenException(
+        'You can only edit or delete test cases you created',
+      );
+    }
   }
 
   async create(dto: CreateTestCaseDto, userId: string) {
@@ -133,8 +147,9 @@ export class TestCasesService {
     return testCase;
   }
 
-  async update(id: string, dto: UpdateTestCaseDto, userId: string) {
+  async update(id: string, dto: UpdateTestCaseDto, userId: string, role: Role) {
     const existing = await this.findExistingOrThrow(id);
+    this.assertCanModify(existing, userId, role);
 
     if (dto.jiraTaskId) {
       await this.assertJiraTaskBelongsToProject(
@@ -162,8 +177,9 @@ export class TestCasesService {
     return updated;
   }
 
-  async remove(id: string, userId: string) {
+  async remove(id: string, userId: string, role: Role) {
     const existing = await this.findExistingOrThrow(id);
+    this.assertCanModify(existing, userId, role);
 
     await this.prisma.testCase.delete({ where: { id } });
 

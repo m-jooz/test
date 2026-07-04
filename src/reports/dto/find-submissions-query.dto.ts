@@ -32,4 +32,9 @@ export class FindSubmissionsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   taskSearch?: string;
+
+  @ApiPropertyOptional({ example: 'a3f1c2e4-1234-4abc-9def-0123456789ab' })
+  @IsOptional()
+  @IsUUID()
+  jiraTaskId?: string;
 }

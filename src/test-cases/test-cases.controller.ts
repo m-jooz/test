@@ -52,22 +52,28 @@ export class TestCasesController {
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.LEAD, Role.TESTER)
-  @ApiOperation({ summary: 'Update a test case (Admin/Lead/Tester only)' })
+  @ApiOperation({
+    summary:
+      'Update a test case (Admin/Lead can edit any; Tester can only edit their own)',
+  })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTestCaseDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.testCasesService.update(id, dto, user.id);
+    return this.testCasesService.update(id, dto, user.id, user.role);
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN, Role.LEAD)
-  @ApiOperation({ summary: 'Delete a test case (Admin/Lead only)' })
+  @Roles(Role.ADMIN, Role.LEAD, Role.TESTER)
+  @ApiOperation({
+    summary:
+      'Delete a test case (Admin/Lead can delete any; Tester can only delete their own)',
+  })
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.testCasesService.remove(id, user.id);
+    return this.testCasesService.remove(id, user.id, user.role);
   }
 }

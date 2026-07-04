@@ -385,11 +385,12 @@ export class ReportsService {
   private buildSubmissionsWhere(
     query: Pick<
       FindSubmissionsQueryDto,
-      'projectId' | 'dateFrom' | 'dateTo' | 'status' | 'testerId' | 'taskSearch'
+      'projectId' | 'dateFrom' | 'dateTo' | 'status' | 'testerId' | 'taskSearch' | 'jiraTaskId'
     >,
   ): Prisma.QaSubmissionWhereInput {
     return {
       projectId: query.projectId,
+      ...(query.jiraTaskId && { jiraTaskId: query.jiraTaskId }),
       ...(query.status && { overallStatus: query.status }),
       ...(query.testerId && { submittedBy: query.testerId }),
       ...((query.dateFrom || query.dateTo) && {
