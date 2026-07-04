@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Loader2, PlayCircle, RefreshCw, Search } from 'lucide-react'
+import { Loader2, PlayCircle, RefreshCw, Search, Users } from 'lucide-react'
 import api from '../../api/client'
 import { formatRelativeTime } from '../../lib/formatRelativeTime'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { invalidateQaData } from '../../lib/invalidateQaData'
+import { getInitials } from '../../lib/getInitials'
 import { QA_OVERALL_STATUS_BADGE } from '../../lib/badges'
 import type {
   ApiResponse,
@@ -28,9 +29,9 @@ export default function DashboardPage() {
     () => localStorage.getItem(LAST_PROJECT_KEY),
   )
   const [search, setSearch] = useState('')
-  const [qaRequestedByName, setQaRequestedByName] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [readySentByFilter, setReadySentByFilter] = useState('')
   const [justSyncedAt, setJustSyncedAt] = useState<Date | null>(null)
   const debouncedSearch = useDebouncedValue(search)
   const autoSyncedProjectId = useRef<string | null>(null)
@@ -70,7 +71,6 @@ export default function DashboardPage() {
       'qa-overview',
       projectId,
       debouncedSearch,
-      qaRequestedByName,
       dateFrom,
       dateTo,
     ],
@@ -80,7 +80,6 @@ export default function DashboardPage() {
         {
           params: {
             search: debouncedSearch || undefined,
-            qaRequestedByName: qaRequestedByName || undefined,
             dateFrom: dateFrom || undefined,
             dateTo: dateTo || undefined,
           },
@@ -91,13 +90,19 @@ export default function DashboardPage() {
     enabled: Boolean(projectId),
   })
 
-  const requesterOptions = useMemo(() => {
+  const readyRequesterOptions = useMemo(() => {
     const names = new Set<string>()
     overview?.readyForTesting.forEach((task) => {
       if (task.qaRequestedByName) names.add(task.qaRequestedByName)
     })
     return Array.from(names)
   }, [overview])
+
+  const filteredReadyForTesting = useMemo(() => {
+    const tasks = overview?.readyForTesting ?? []
+    if (!readySentByFilter) return tasks
+    return tasks.filter((task) => task.qaRequestedByName === readySentByFilter)
+  }, [overview, readySentByFilter])
 
   const { mutate: sync, isPending: isSyncing } = useMutation({
     mutationFn: (id: string) => api.post(`/jira/${id}/sync`),
@@ -187,18 +192,6 @@ export default function DashboardPage() {
                 className="w-56 rounded-lg border border-gray-700 bg-gray-900 py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               />
             </div>
-            <select
-              value={qaRequestedByName}
-              onChange={(e) => setQaRequestedByName(e.target.value)}
-              className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">{t('dashboard.sentByAnyone')}</option>
-              {requesterOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
             <input
               type="date"
               value={dateFrom}
@@ -238,8 +231,43 @@ export default function DashboardPage() {
                     }
                   />
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {overview.readyForTesting.map((task) => (
+                  <>
+                    <div className="mb-3 flex flex-wrap items-center gap-3">
+                      <label className="text-xs font-medium text-gray-400">
+                        {t('jira.sentToQaBy')}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {readySentByFilter ? (
+                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-[10px] font-semibold text-indigo-300">
+                            {getInitials(readySentByFilter)}
+                          </span>
+                        ) : (
+                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-700 text-gray-400">
+                            <Users size={12} />
+                          </span>
+                        )}
+                        <select
+                          value={readySentByFilter}
+                          onChange={(e) => setReadySentByFilter(e.target.value)}
+                          className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="">{t('dashboard.allPeople')}</option>
+                          {readyRequesterOptions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {t('dashboard.showingCount', {
+                          shown: filteredReadyForTesting.length,
+                          total: overview.readyForTesting.length,
+                        })}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {filteredReadyForTesting.map((task) => (
                       <div
                         key={task.id}
                         className="flex flex-col justify-between rounded-xl border border-gray-700 bg-gray-800 p-4"
@@ -277,8 +305,9 @@ export default function DashboardPage() {
                           {t('dashboard.startTesting')}
                         </button>
                       </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </section>
 

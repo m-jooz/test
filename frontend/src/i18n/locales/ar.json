@@ -110,6 +110,8 @@
     "assignee": "المسؤول",
     "startTesting": "بدء الاختبار",
     "sentByAnyone": "أُرسلت من أي شخص",
+    "allPeople": "الجميع",
+    "showingCount": "عرض {{shown}} من {{total}} مهمة",
     "searchPlaceholder": "ابحث بالعنوان أو المفتاح…",
     "testCasesCompleted": "{{completed}}/{{total}} حالة اختبار مكتملة",
     "selectProjectPrompt": "اختر مشروعًا للبدء",

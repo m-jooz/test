@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ClipboardList, Loader2, RefreshCw, Search } from 'lucide-react'
+import { ClipboardList, Loader2, RefreshCw, Search, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../api/client'
 import { jiraStatusBadgeClass, QA_STATUS_BADGE } from '../../../lib/badges'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import { invalidateQaData } from '../../../lib/invalidateQaData'
+import { getInitials } from '../../../lib/getInitials'
 import type { ApiResponse, JiraTask, PaginatedResult } from '../../../types'
 import Pagination from '../../../components/Pagination'
 import TableSkeleton from '../components/TableSkeleton'
@@ -34,6 +35,7 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
   const [selectedTask, setSelectedTask] = useState<JiraTask | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [sentByFilter, setSentByFilter] = useState('')
   const debouncedSearch = useDebouncedValue(search)
 
   useEffect(() => {
@@ -56,6 +58,20 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
     },
   })
   const tasks = result?.data
+
+  const sentByOptions = useMemo(() => {
+    const names = new Set<string>()
+    tasks?.forEach((task) => {
+      if (task.qaRequestedByName) names.add(task.qaRequestedByName)
+    })
+    return Array.from(names)
+  }, [tasks])
+
+  const filteredTasks = useMemo(() => {
+    if (!tasks) return tasks
+    if (!sentByFilter) return tasks
+    return tasks.filter((task) => task.qaRequestedByName === sentByFilter)
+  }, [tasks, sentByFilter])
 
   const { mutate: sync, isPending: isSyncing } = useMutation({
     mutationFn: () => api.post(`/jira/${projectId}/sync`),
@@ -99,6 +115,42 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
             className="w-56 rounded-lg border border-gray-700 bg-gray-900 py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-400">
+            {t('jira.sentToQaBy')}
+          </label>
+          {sentByFilter ? (
+            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-[10px] font-semibold text-indigo-300">
+              {getInitials(sentByFilter)}
+            </span>
+          ) : (
+            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-700 text-gray-400">
+              <Users size={12} />
+            </span>
+          )}
+          <select
+            value={sentByFilter}
+            onChange={(e) => setSentByFilter(e.target.value)}
+            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="">{t('dashboard.allPeople')}</option>
+            {sentByOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          {tasks && tasks.length > 0 && (
+            <span className="text-xs text-gray-500">
+              {t('dashboard.showingCount', {
+                shown: filteredTasks?.length ?? 0,
+                total: tasks.length,
+              })}
+            </span>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => sync()}
@@ -129,7 +181,16 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
         />
       )}
 
-      {!isLoading && !isError && tasks && tasks.length > 0 && (
+      {!isLoading &&
+        !isError &&
+        tasks &&
+        tasks.length > 0 &&
+        filteredTasks &&
+        filteredTasks.length === 0 && (
+          <EmptyState icon={Users} title={t('jira.noTasksMatch')} />
+        )}
+
+      {!isLoading && !isError && filteredTasks && filteredTasks.length > 0 && (
         <>
         <div className="overflow-hidden rounded-xl border border-gray-700">
           <table className="w-full text-left text-sm">
@@ -147,7 +208,7 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700 bg-gray-800">
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
                 <tr
                   key={task.id}
                   onClick={() => handleRowClick(task)}
@@ -175,7 +236,16 @@ export default function JiraTasksTab({ projectId }: JiraTasksTabProps) {
                     {task.currentAssignee ?? t('common.unassigned')}
                   </td>
                   <td className="px-4 py-3 text-gray-400">
-                    {task.qaRequestedByName ?? '-'}
+                    {task.qaRequestedByName ? (
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-[9px] font-semibold text-indigo-300">
+                          {getInitials(task.qaRequestedByName)}
+                        </span>
+                        {task.qaRequestedByName}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span

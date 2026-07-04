@@ -111,6 +111,8 @@
     "assignee": "Assignee",
     "startTesting": "Start Testing",
     "sentByAnyone": "Sent by anyone",
+    "allPeople": "All People",
+    "showingCount": "Showing {{shown}} of {{total}} tasks",
     "searchPlaceholder": "Search by title or key…",
     "testCasesCompleted": "{{completed}}/{{total}} test cases completed",
     "selectProjectPrompt": "Select a project to get started",
